@@ -2,7 +2,27 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8"> 
-    <title>Pokémon List</title>
+    <title>Pokémon Wiki</title>
+    <!--
+        Test Site.html - Single-file Pokémon browser
+
+        Overview:
+        - This file contains the entire client-side application (HTML, CSS, JS).
+        - The app is designed to run from file:// or http(s). It attempts to load an embedded JS data file (js/pokemon-data.js), then a JSON file (json/pokemon-full-data.json), and finally falls back to a file picker.
+
+        Major runtime responsibilities (search this file for these symbols):
+        - LocalStorageCache: in-memory caching wrapper for localStorage reads/writes.
+        - StorageManager: centralized persistence operations and cached parsed progress.
+        - Utils: reusable UI helper functions (progress bars, badges, chips, search matching).
+        - renderPokemon(): main render loop that builds the DOM for regions and cards.
+        - LazyImageObserver: singleton IntersectionObserver instance used for image lazy-loading.
+        - markSeenCaught(): helper to toggle seen/caught state and persist progress.
+
+        Developer notes:
+        - Prefer delegating event handlers for repeated elements (see #pokemon-list delegation) to reduce allocations.
+        - Use StorageManager.saveProgress / getProgress to keep the _progressCache coherent.
+        - When adding features, add corresponding entries to docs/*.md and update README.md.
+    -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
     :root {
@@ -882,8 +902,13 @@
         </div>
     </div>
     <script>
-        // Performance optimization: Cache localStorage operations
-        const LocalStorageCache = {
+    // Performance optimization: Cache localStorage operations
+    // LocalStorage can be synchronous and slow when used heavily during rendering.
+    // LocalStorageCache provides a small Map-backed cache so repeated reads within
+    // a single page load hit memory instead of invoking the blocking localStorage API.
+    // This cache is intentionally simple; callers should still write through to
+    // localStorage via LocalStorageCache.set so other tabs can observe changes.
+    const LocalStorageCache = {
             cache: new Map(),
             get(key) {
                 if (this.cache.has(key)) return this.cache.get(key);
@@ -903,8 +928,11 @@
             }
         };
 
-        // Utility functions for common operations
-        const Utils = {
+    // Utility functions for common operations
+    // These helpers are small, reusable pieces of UI logic used across the app.
+    // Keep functions pure where possible; when DOM nodes are returned they are
+    // created but not attached to the document so callers can position them.
+    const Utils = {
             // Reusable function for creating progress bars
             createProgressBar(type, current, total, iconSrc) {
                 const percentage = total > 0 ? Math.round(current / total * 100) : 0;
@@ -972,15 +1000,20 @@
             }
         };
 
-        // small inline fallback image (data URI) used when sprite fails to load
-        const FALLBACK_IMG = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' fill='%23f6f8fa'/><circle cx='32' cy='32' r='28' fill='%23ef5350'/><rect x='0' y='30' width='64' height='4' fill='%23fff'/></svg>";
-        // Favorites: persisted set of pokemon ids (numbers)
-        const LS_FAVORITES_KEY = 'pokemonFavoritesV1';
-        let favorites = new Set();
-        // favorites filter state (when true, only favorites are shown)
-        let favoritesFilterOn = false;
+    // Small inline fallback image (data URI) used when a sprite fails to load.
+    // Using a tiny inline SVG prevents layout shift and provides a visible placeholder.
+    const FALLBACK_IMG = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' fill='%23f6f8fa'/><circle cx='32' cy='32' r='28' fill='%23ef5350'/><rect x='0' y='30' width='64' height='4' fill='%23fff'/></svg>";
+
+    // Favorites: persisted set of pokemon ids (numbers)
+    // Key: LS_FAVORITES_KEY stored as JSON array of ids. We keep an in-memory Set
+    // for efficient lookup when rendering and filtering.
+    const LS_FAVORITES_KEY = 'pokemonFavoritesV1';
+    let favorites = new Set();
+    // favorites filter state (when true, only favorites are shown)
+    let favoritesFilterOn = false;
         
-    // Optimized localStorage operations using cache
+    // Load favorites from localStorage into an in-memory Set. This function tolerates
+    // invalid or missing data by falling back to an empty set.
     function loadFavorites() { 
         try { 
             const j = JSON.parse(LocalStorageCache.get(LS_FAVORITES_KEY) || '[]'); 
@@ -989,6 +1022,9 @@
             } 
         } catch(e){ favorites = new Set(); } 
     }
+
+    // Persist favorites into localStorage via LocalStorageCache. Using LocalStorageCache
+    // keeps the in-memory cache consistent and reduces repeated blocking localStorage calls.
     function saveFavorites() { 
         try { 
             LocalStorageCache.set(LS_FAVORITES_KEY, JSON.stringify(Array.from(favorites))); 
@@ -996,8 +1032,10 @@
     }
     loadFavorites();
                 // Renders the Pokémon cards and progress bars for selected regions
-        // Performance monitoring utility (development only)
-        const PerfMonitor = {
+    // Performance monitoring utility (development only)
+    // Use PerfMonitor.start(label) and PerfMonitor.end(label) around expensive ops
+    // to log operations that exceed the threshold (50ms by default).
+    const PerfMonitor = {
             timers: new Map(),
             
             start(label) {
@@ -1018,8 +1056,22 @@
             }
         };
 
-        // Performance-monitored render function
-        function renderPokemon() {
+    /**
+     * renderPokemon()
+     * Main rendering function. Responsible for building the DOM for all selected regions
+     * and their Pokémon cards.
+     *
+     * Side effects:
+     * - Reads persisted progress via StorageManager.getProgress()
+     * - Updates #pokemon-list inner DOM (batch-insert via DocumentFragment)
+     * - Calls enableLazyImages() to attach lazy loading to new images
+     *
+     * Performance notes:
+     * - Uses PerfMonitor to log slow renders (>50ms)
+     * - Filters data in-memory before DOM creation to minimize node churn
+     */
+    // Performance-monitored render function
+    function renderPokemon() {
             PerfMonitor.start('renderPokemon');
             
             try {
@@ -1092,20 +1144,23 @@
                         // Responsive columns: compute columns based on available window width and desired card width
                         // Use cssText for better performance than individual style assignments
                         (function applyResponsiveGridStyles(g){
-                            // Base sizes
-                            let desiredCardWidth = 220; // px per card (preferred)
-                            const gap = 20; // grid gap in px
-                            const containerPadding = 40; // horizontal padding allowance
-                            const maxContainer = 1600; // don't grow beyond this site width
-                            // Slightly increase card width on very wide screens for better readability
-                            if (window.innerWidth >= 1600) desiredCardWidth = 240;
-                            // Compute available width and clamp column count to a reasonable max
-                            const avail = Math.min(window.innerWidth, maxContainer) - containerPadding;
-                            const approxCols = Math.max(1, Math.floor(avail / (desiredCardWidth + gap)));
-                            const maxColumns = 8;
-                            const columns = Math.min(maxColumns, approxCols);
-                            const maxWidth = Math.min(maxContainer, columns * desiredCardWidth + (columns - 1) * gap);
-                            g.style.cssText = `display:grid;grid-template-columns:repeat(${columns},1fr);gap:${gap}px;max-width:${maxWidth}px;margin:0 auto;justify-content:center`;
+                            // Gap & max site width
+                            const gap = 20;
+                            const maxContainer = 1600;
+
+                            // Estimate a reasonable column count based on a preferred card width,
+                            // then clamp to [1, 8] columns so we don't over-dense on very large screens.
+                            const preferred = 220;
+                            const approxCols = Math.max(1, Math.floor(Math.min(window.innerWidth, maxContainer) / (preferred + gap)));
+                            const columns = Math.min(8, Math.max(1, approxCols));
+
+                            // Compute a min card width that fills the available space without getting too small.
+                            // Clamp between 140px and 260px for consistent readability.
+                            const minWidth = Math.max(140, Math.min(260, Math.floor((Math.min(window.innerWidth, maxContainer) - gap * (columns - 1)) / columns)));
+                            const maxWidth = Math.min(maxContainer, columns * minWidth + (columns - 1) * gap);
+
+                            // Use auto-fit / minmax so the grid adapts and cards stretch evenly.
+                            g.style.cssText = `display:grid;grid-template-columns:repeat(auto-fit, minmax(${minWidth}px, 1fr));gap:${gap}px;max-width:${maxWidth}px;margin:0 auto;justify-content:center;padding:0 12px;box-sizing:border-box;`;
                         })(grid);
                         let visibleCount = 0;
                         
@@ -1580,19 +1635,28 @@
         function toTitleCase(s) {
             return (s || '').toString().replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
         }
+        // showAbilityModal(abilityName)
+        // - Displays an accessible modal with a short description for `abilityName`.
+        // - Lookup order: in-memory enriched cache (`abilityCache`) -> base map (`abilityDescriptionsLC`) ->
+        //   persisted localStorage cache (`abilityDescCacheLS`) -> remote fetch from PokeAPI.
+        // - Side-effects: may write to `abilityDescCacheLS` (persisted under `LS_ABILITY_CACHE_KEY`) and
+        //   populate the in-memory `abilityCache` to avoid repeated fetches.
+        // - Accessibility: sets role/aria-modal, focus-traps the dialog, and uses aria-live on the description
+        //   to announce remote fetch results to screen readers.
         function showAbilityModal(abilityName) {
                 const modal = document.getElementById('ability-modal');
                 const title = document.getElementById('ability-modal-title');
                 const desc = document.getElementById('ability-modal-desc');
                 const content = document.getElementById('ability-modal-content');
             if (!modal || !title || !desc) return;
+                // Human-friendly title
                 title.textContent = toTitleCase(abilityName);
                 // Accessibility: mark modal dialog and set role/labels
                 modal.setAttribute('role', 'dialog');
                 modal.setAttribute('aria-modal', 'true');
                 title.id = title.id || 'ability-modal-title';
                 content.setAttribute('aria-labelledby', title.id);
-                // Save the element that had focus so we can restore on close
+                // Save the element that had focus so we can restore focus on close
                 const previouslyFocused = document.activeElement;
                 // Ensure description area is focusable for announcement
                 desc.tabIndex = 0;
@@ -1603,15 +1667,18 @@
             const hasLS = !!abilityDescCacheLS[key];
             let text = abilityCache[key]?.description || abilityDescriptionsLC[key] || (hasLS ? abilityDescCacheLS[key] : 'No description available.');
             if (hasLS && !hasCache) {
+                // Seed the in-memory cache from persisted localStorage
                 abilityCache[key] = { description: abilityDescCacheLS[key] };
             }
+            // If we have no local description, fetch from the API and persist result.
             if (!hasCache && !hasBase && !hasLS && key) {
                 desc.innerHTML = '<span class="ability-loading">Fetching description…</span>';
-                // add an aria-live region so screen readers announce updates
+                // add an aria-live region so screen readers announce updates when fetch completes
                 desc.setAttribute('aria-live', 'polite');
                 fetch(`https://pokeapi.co/api/v2/ability/${encodeURIComponent(key)}`)
                     .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
                     .then(data => {
+                        // Prefer short_effect or effect from the English effect_entries; fallback to flavor_text_entries.
                         let newText = '';
                         try {
                             const entries = data && Array.isArray(data.effect_entries) ? data.effect_entries : [];
@@ -1627,16 +1694,19 @@
                             } catch (e) { /* noop */ }
                         }
                         if (!newText) newText = 'No description available.';
+                        // Update UI and caches
                         desc.textContent = newText;
                         abilityCache[key] = { description: newText };
                         abilityDescCacheLS[key] = newText;
                         saveAbilityDescCache(abilityDescCacheLS);
                     })
                     .catch(err => {
+                        // Log fetch failures but keep UI usable
                         console.warn('[Abilities] Fetch failed for', key, err);
                         desc.textContent = 'No description available.';
                     });
             } else {
+                // Immediately render existing description
                 desc.textContent = text;
             }
             // (copy description feature removed)
@@ -1844,7 +1914,19 @@
         }
 
         // Build and render the types filter panel
+        // Responsibilities:
+        // - Inspect allPokemon to discover available type strings and counts
+        // - Render a compact grid of type buttons into `#types-list`
+        // - Do NOT retain per-button event handlers here; instead set data-* attributes
+        //   so the global delegation handler can process clicks. This reduces
+        //   per-card allocations and keeps event routing centralized.
+        // Inputs:
+        // - allPokemon: array of pokemon objects, each may have `types: string[]`
+        // Side effects:
+        // - Updates DOM under `#types-list`
+        // - Persists the selected types set to localStorage via StorageManager APIs
         function renderTypesPanel(allPokemon) {
+            // Build a frequency map of types -> count
             const typesSet = new Map();
             (allPokemon || []).forEach(p => {
                 if (Array.isArray(p.types)) p.types.forEach(t => {
@@ -1852,15 +1934,25 @@
                     typesSet.set(key, (typesSet.get(key) || 0) + 1);
                 });
             });
+
+            // Sort type keys for predictable UI order
             const types = Array.from(typesSet.keys()).sort();
             const container = document.getElementById('types-list');
-            if (!container) return;
+            if (!container) return; // defensive
             container.innerHTML = '';
+
+            // Render each type as a button with data-type and data-action attributes.
+            // The delegated click handler listens for data-action="toggle-type" and
+            // will toggle membership in `selectedTypes` and persist via StorageManager.
             types.forEach(t => {
                 const key = t.toLowerCase();
                 const el = document.createElement('button');
                 el.className = 'type-item';
-                // add icon if available
+                el.setAttribute('data-action', 'toggle-type');
+                el.setAttribute('data-type', key);
+                el.setAttribute('type', 'button');
+
+                // add icon if available (non-blocking)
                 const iconPath = typeIconMap[key];
                 if (iconPath) {
                     const img = document.createElement('img');
@@ -1870,24 +1962,22 @@
                     img.onerror = () => { img.style.display = 'none'; };
                     el.appendChild(img);
                 }
+
                 const txt = document.createTextNode(t.charAt(0).toUpperCase() + t.slice(1));
                 el.appendChild(txt);
-                el.onclick = () => {
-                    if (selectedTypes.has(key)) selectedTypes.delete(key); else selectedTypes.add(key);
-                    // Update selected classes
-                    Array.from(container.querySelectorAll('.type-item')).forEach(b => b.classList.toggle('selected', selectedTypes.has(b.textContent.toLowerCase())));
-                    try { localStorage.setItem('selectedTypesV1', JSON.stringify(Array.from(selectedTypes))); } catch {}
-                    renderPokemonSafe();
-                };
+
+                // Reflect selected state via class; click handling performed by delegation
                 if (selectedTypes.has(key)) el.classList.add('selected');
                 container.appendChild(el);
             });
-            // Add a clear filter button
+
+            // Add a clear filter button that the delegated handler will recognize
             const clear = document.createElement('button');
             clear.className = 'type-item';
             clear.textContent = 'Show all';
             clear.style.fontWeight = '600';
-            clear.onclick = () => { selectedTypes.clear(); try { localStorage.removeItem('selectedTypesV1'); } catch {} ; Array.from(container.querySelectorAll('.type-item')).forEach(b => b.classList.remove('selected')); renderPokemonSafe(); };
+            clear.setAttribute('data-action', 'clear-types');
+            clear.setAttribute('type', 'button');
             container.appendChild(clear);
         }
 
@@ -1942,8 +2032,14 @@
             document.head.appendChild(script);
         }
 
-        // Shared IntersectionObserver for lazy images to avoid recreating observers on every render
-        const LazyImageObserver = (function(){
+    /**
+     * LazyImageObserver
+     * Singleton wrapper around IntersectionObserver used to lazily set `img.src` from `data-src`.
+     * This avoids creating many observers across renders and centralizes error handling.
+     * Usage: LazyImageObserver.observe(imgElement)
+     */
+    // Shared IntersectionObserver for lazy images to avoid recreating observers on every render
+    const LazyImageObserver = (function(){
             if (!('IntersectionObserver' in window)) return null;
             let observer = null;
             function getObserver() {
@@ -1984,14 +2080,25 @@
         })();
 
         // lazy-loading helper: observes images with data-src using the shared observer
+        /**
+         * enableLazyImages()
+         * Find all images with class `lazy-img` and attach lazy loading behavior.
+         * Uses LazyImageObserver when available, otherwise falls back to immediately
+         * setting `img.src` from `data-src`.
+         * Call this after new images are added to the DOM (e.g., after renderPokemon()).
+         */
         function enableLazyImages() {
             const imgs = Array.from(document.querySelectorAll('img.lazy-img'));
             if (!imgs.length) return;
             imgs.forEach(i => LazyImageObserver ? LazyImageObserver.observe(i) : (function(){ if (i.dataset && i.dataset.src) { i.src = i.dataset.src; delete i.dataset.src; } })());
         }
 
-        // MAIN ENTRY POINT: Runs when the page loads
-        window.addEventListener('DOMContentLoaded', () => {
+    // MAIN ENTRY POINT: Runs when the page loads
+    // Initialization sequence:
+    // 1. Restore UI state from localStorage (sidebar state, selected types/regions)
+    // 2. Wire UI controls (search, toolbar, toggles)
+    // 3. Attempt to load embedded data (js/pokemon-data.js) or fetch JSON
+    window.addEventListener('DOMContentLoaded', () => {
             // Restore sidebar open state and wire toggle
             try {
                 const saved = localStorage.getItem('nav-open');
@@ -2034,6 +2141,8 @@
             }
             // Wire search input (always available)
             // Optimized debounce function
+            // Debouncing input handlers reduces render churn when users type quickly.
+            // Use debounce(fn, wait) to wrap UI handlers that update the view.
             function debounce(fn, wait=200){ 
                 let t; 
                 return (...a) => { 
@@ -2107,7 +2216,13 @@
             // Restore selectedTypes from localStorage using StorageManager
             selectedTypes = StorageManager.getSelectedTypes();
 
-            // Delegate click handling for pokemon list actions (toggle favorite / seen / caught)
+            // Delegate click handling for pokemon list actions and types panel clicks.
+            // This single handler routes all UI actions expressed via `data-action`.
+            // Expected attributes on actionable elements:
+            // - data-action: one of {toggle-favorite, toggle-seen, toggle-caught, toggle-type, clear-types}
+            // - data-pokemon-id: the numeric pokemon id for per-pokemon actions
+            // - data-region: optional region name used by progress storage
+            // - data-type: lowercase type key for types panel buttons
             (function setupPokemonListDelegation(){
                 const listDiv = document.getElementById('pokemon-list');
                 if (!listDiv) return;
@@ -2118,7 +2233,8 @@
                         const action = btn.getAttribute('data-action');
                         const pid = btn.getAttribute('data-pokemon-id');
                         const region = btn.getAttribute('data-region');
-                        if (!action || !pid) return;
+                        const dtype = btn.getAttribute('data-type');
+                        if (!action) return;
                         switch(action) {
                             case 'toggle-favorite': {
                                 const id = Number(pid);
@@ -2141,6 +2257,26 @@
                                 markSeenCaught(region || '', pid, true);
                                 break;
                             }
+                            case 'toggle-type': {
+                                // type toggles come from the types panel; dtype is the lowercase key
+                                if (!dtype) return;
+                                if (selectedTypes.has(dtype)) selectedTypes.delete(dtype); else selectedTypes.add(dtype);
+                                // Persist and re-render
+                                try { StorageManager.saveSelectedTypes(selectedTypes); } catch (e) { console.warn('saveSelectedTypes failed', e); }
+                                // Update selected classes in the panel (cheap DOM update)
+                                const typesContainer = document.getElementById('types-list');
+                                if (typesContainer) Array.from(typesContainer.querySelectorAll('.type-item')).forEach(b => b.classList.toggle('selected', selectedTypes.has(b.getAttribute('data-type'))));
+                                renderPokemonSafe();
+                                break;
+                            }
+                            case 'clear-types': {
+                                selectedTypes.clear();
+                                try { StorageManager.saveSelectedTypes(selectedTypes); } catch (e) { /* ignore */ }
+                                const typesContainer2 = document.getElementById('types-list');
+                                if (typesContainer2) Array.from(typesContainer2.querySelectorAll('.type-item')).forEach(b => b.classList.remove('selected'));
+                                renderPokemonSafe();
+                                break;
+                            }
                             default:
                                 break;
                         }
@@ -2151,6 +2287,10 @@
             })();
 
             // --- Export / Import progress helpers ---
+            // exportProgress(): creates a downloadable JSON file containing the
+            // exact contents of localStorage['pokemonProgress']. The JSON schema
+            // used by this app is an object whose keys are region names and values
+            // are objects of the shape { seen: number[], caught: number[] }.
             function exportProgress() {
                 try {
                     const data = localStorage.getItem('pokemonProgress') || '{}';
@@ -2167,6 +2307,13 @@
                 } catch (e) { alert('Export failed: ' + (e && e.message)); }
             }
 
+            // importProgressFromFile(file, opts)
+            // - Reads a user-supplied JSON file and either replaces or merges it with
+            //   the existing `pokemonProgress` localStorage key.
+            // - Merge semantics: for each region key, `seen` and `caught` arrays are
+            //   merged uniquely (Set union) so imported entries are additive by default.
+            // - On success the function persists the new `pokemonProgress` value and
+            //   resolves with the resulting object.
             function importProgressFromFile(file, opts = { merge: true }) {
                 return new Promise((resolve, reject) => {
                     if (!file) return reject(new Error('No file'));
@@ -2483,8 +2630,19 @@
             renderPokemon();
         }
 
-        // --- Progress and Region Management with Cached localStorage ---
-        const StorageManager = {
+    /**
+     * StorageManager
+     * Centralized localStorage helper that caches parsed progress to avoid repeated JSON.parse
+     * on hot render paths. All reads/writes related to persisted UI state should go through
+     * this object when possible.
+     *
+     * Keys used:
+     * - 'pokemonProgress' => JSON object mapping region -> { seen: [], caught: [] }
+     * - 'selectedRegions'  => JSON array of region keys
+     * - 'selectedTypesV1'  => JSON array of lower-case type names
+     */
+    // --- Progress and Region Management with Cached localStorage ---
+    const StorageManager = {
             // Progress operations (cache parsed progress to avoid repeated JSON.parse on hot paths)
             _progressCache: null,
             invalidateProgress() {
@@ -2553,6 +2711,10 @@
             } catch (err) { /* noop */ }
         });
 
+        /**
+         * getProgress / saveProgress
+         * Small wrappers that delegate to StorageManager for clearer call sites.
+         */
         // --- Seen/Caught progress helpers ---
         function getProgress() {
             return StorageManager.getProgress();
@@ -2570,8 +2732,19 @@
             const idx = arr.indexOf(value);
             if (idx >= 0) arr.splice(idx, 1); else arr.push(value);
         }
-        // Toggle seen/caught for a Pokémon; caught implies seen
-        function markSeenCaught(regionName, pokemonId, isCaught) {
+    /**
+     * markSeenCaught(regionName, pokemonId, isCaught)
+     * Toggle seen/caught state for a Pokémon in a given region. This function is the
+     * canonical way to mutate progress; it ensures consistency (caught => seen) and
+     * persists via StorageManager.saveProgress(). It triggers a re-render at the end.
+     *
+     * Parameters:
+     * - regionName: string (region/generation identifier)
+     * - pokemonId: number|string (will be coerced to Number)
+     * - isCaught: boolean (true toggles caught, false toggles seen)
+     */
+    // Toggle seen/caught for a Pokémon; caught implies seen
+    function markSeenCaught(regionName, pokemonId, isCaught) {
             regionName = canonicalizeRegionName(regionName);
             const id = Number(pokemonId);
             if (!regionName || !Number.isFinite(id)) return;
