@@ -2182,27 +2182,30 @@
                 if (!file) return;
                 const reader = new FileReader();
                 reader.onload = () => {
+                    // Debug: report filename and size
+                    try { console.info('Selected file:', file.name, 'size:', file.size); } catch (e) {}
                     try {
                         const parsed = JSON.parse(String(reader.result));
                         let dataArray = null;
                         if (Array.isArray(parsed)) {
                             dataArray = parsed;
                         } else if (parsed && typeof parsed === 'object') {
-                            // Common wrappers: { pokemon: [...] } or { data: [...] } or similar.
-                            // Pick the first array-valued property we find.
                             for (const k of Object.keys(parsed)) {
                                 if (Array.isArray(parsed[k])) { dataArray = parsed[k]; break; }
                             }
                         }
                         if (!Array.isArray(dataArray)) {
-                            alert('Invalid JSON structure. Select the project\'s pokemon-full-data.json (an array or wrapper containing the array).');
-                            console.error(new Error('JSON did not contain an array at root or as a property'));
+                            const msg = `Invalid JSON structure in ${file.name}. Expected an array at the root or a property containing an array.`;
+                            alert(msg);
+                            console.error(msg, parsed);
                             return;
                         }
+                        try { console.info(`Loaded ${dataArray.length} entries from ${file.name}`); } catch (e) {}
                         processPokemonData(dataArray);
                     } catch (e) {
-                        alert('Invalid JSON file. Please select the pokemon-full-data.json file.');
-                        console.error(e);
+                        const message = e && e.message ? e.message : String(e);
+                        alert(`Invalid JSON file "${file.name}": ${message}`);
+                        console.error('Failed to parse selected JSON file', file.name, e);
                     }
                 };
                 reader.readAsText(file);
