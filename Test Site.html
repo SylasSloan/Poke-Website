@@ -1302,9 +1302,19 @@
                             number.className = 'pokemon-number';
                             number.textContent = `#${pokemon.id.toString().padStart(3, '0')}`;
                             card.appendChild(number);
-                            const name = document.createElement('div');
+                            const name = document.createElement('button');
                             name.className = 'pokemon-name';
+                            name.type = 'button';
                             name.textContent = pokemon.name.charAt(0).toUpperCase() + pokemon.name.slice(1);
+                            name.setAttribute('data-action', 'open-details');
+                            name.setAttribute('data-pokemon-id', String(pokemon.id));
+                            name.style.background = 'none';
+                            name.style.border = 'none';
+                            name.style.padding = '0';
+                            name.style.cursor = 'pointer';
+                            name.style.color = 'var(--text)';
+                            name.style.font = 'inherit';
+                            name.style.width = '100%';
                             card.appendChild(name);
                             if (pokemon.sprite) {
                                 const img = document.createElement('img');
@@ -1359,7 +1369,7 @@
                             }
                             const detailHint = document.createElement('div');
                             detailHint.className = 'detail-hint';
-                            detailHint.textContent = 'Select to view abilities, stats, and notes';
+                            detailHint.textContent = 'Click the name for full details';
                             card.appendChild(detailHint);
                             const detailPanel = document.createElement('div');
                             detailPanel.className = 'pokemon-detail-panel';
@@ -2399,6 +2409,11 @@
                         const dtype = btn.getAttribute('data-type');
                         if (!action) return;
                         switch(action) {
+                            case 'open-details': {
+                                if (!pid) return;
+                                window.open(`pokemon-detail.html?id=${pid}`, '_blank', 'noopener,noreferrer');
+                                break;
+                            }
                             case 'toggle-favorite': {
                                 const id = Number(pid);
                                 if (!Number.isFinite(id)) return;
