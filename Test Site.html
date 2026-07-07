@@ -201,17 +201,42 @@
         flex-direction: column;
         align-items: center;
     }
-    /* Layout tweak to allow a right-side filter column */
-    .page-with-right { display: grid; grid-template-columns: 1fr 260px; gap: 20px; align-items: start; }
-    @media (max-width: 1000px) { .page-with-right { grid-template-columns: 1fr; } }
+    /* Main content uses a single column while the left sidebar hosts navigation and filtering. */
+    .page-with-right { display: block; }
     #types-panel { 
-        background: var(--card-bg); 
-        border-radius: var(--radius); 
-        box-shadow: var(--shadow); 
-        padding: 12px; 
-        position: sticky; 
-        top: 60px; 
-        z-index: 100;
+        background: transparent; 
+        border-radius: 0; 
+        box-shadow: none; 
+        padding: 0; 
+        position: static; 
+        top: auto; 
+        z-index: auto;
+    }
+    #side-nav .side-section {
+        margin-top: 14px;
+        padding-top: 10px;
+        border-top: 1px solid var(--border);
+    }
+    #side-nav .side-section-title {
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 0 6px 8px 6px;
+    }
+    #side-nav #types-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    #side-nav .type-item {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        width: 100%;
+        margin: 0;
+        text-align: left;
     }
     /* Collapsible left types panel with animation */
     #types-panel { overflow: visible; }
@@ -833,9 +858,8 @@
     <a class="skip-link" href="#pokemon-list" style="position:absolute;left:-999px;top:auto;width:1px;height:1px;overflow:hidden;">Skip to content</a>
     <!-- nav-toggle moved into the top toolbar for a cleaner header -->
     <!-- Left jump navigation -->
-    <nav id="side-nav" aria-label="Generations">
-        <div class="side-title">Generations</div>
-    <!-- Left-side navigation (generations). Types filter moved to the right column. -->
+    <nav id="side-nav" aria-label="Site navigation">
+        <div class="side-title">Browse Pokémon</div>
         <div id="side-nav-items"><div class="side-empty">Loading…</div></div>
     </nav>
     <!--
@@ -915,13 +939,7 @@
         <div>
             <div id="pokemon-list">Loading Pokémon by region...</div>
         </div>
-        <aside id="types-panel" aria-label="Type filters">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-                <h3 style="margin:0">Filter by type</h3>
-                <button id="types-toggle" aria-expanded="true" aria-controls="types-list" title="Collapse types" style="border:0;background:transparent;cursor:pointer;font-size:18px;line-height:1;color:var(--muted);">▾</button>
-            </div>
-            <div id="types-list">Loading…</div>
-        </aside>
+    </div>
     <!-- Ability modal (inserted so showAbilityModal has targets to populate) -->
     <div id="ability-modal" style="display:none;position:fixed;inset:0;z-index:1200;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);">
     <div id="ability-modal-content" class="modal-box">
@@ -1567,24 +1585,53 @@
                     const gens = (Array.isArray(selectedRegions) && selectedRegions.length)
                         ? selectedRegions.slice()
                         : (Array.isArray(regions) ? regions.map(r => r.name) : []);
+
+                    const generationsSection = document.createElement('div');
+                    generationsSection.className = 'side-section';
+                    const generationsTitle = document.createElement('div');
+                    generationsTitle.className = 'side-section-title';
+                    generationsTitle.textContent = 'Generations';
+                    generationsSection.appendChild(generationsTitle);
+
                     if (!gens.length) {
                         const e = document.createElement('div');
                         e.className = 'side-empty';
                         e.textContent = 'No generations selected';
-                        container.appendChild(e);
+                        generationsSection.appendChild(e);
+                        container.appendChild(generationsSection);
                         return;
                     }
                     gens.forEach(name => {
                         const btn = document.createElement('button');
-                        btn.className = 'side-nav-item';
+                        btn.className = 'side-nav-item' + (selectedRegions.includes(name) ? ' active' : '');
                         btn.textContent = formatGeneration(name);
                         btn.title = `Jump to ${formatGeneration(name)}`;
                         btn.onclick = () => {
                             const el = document.getElementById(`section-${name}`);
                             if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
                         };
-                        container.appendChild(btn);
+                        generationsSection.appendChild(btn);
                     });
+                    container.appendChild(generationsSection);
+
+                    const typesSection = document.createElement('div');
+                    typesSection.className = 'side-section';
+                    const typeTitle = document.createElement('div');
+                    typeTitle.className = 'side-section-title';
+                    typeTitle.textContent = 'Filter by type';
+                    typesSection.appendChild(typeTitle);
+                    const typesList = document.createElement('div');
+                    typesList.id = 'types-list';
+                    typesList.setAttribute('aria-label', 'Type filters');
+                    typesSection.appendChild(typesList);
+                    container.appendChild(typesSection);
+
+                    try {
+                        const allPokemonForTypes = Object.values(regionPokemon || {}).flat();
+                        renderTypesPanel(allPokemonForTypes);
+                    } catch (error) {
+                        console.warn('Failed to render sidebar type filters', error);
+                    }
                 }
                 // Updates the appearance of region tabs (selected/unselected)
         function updateTabsUI() {
