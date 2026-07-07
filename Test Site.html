@@ -2421,6 +2421,33 @@
                         switch(action) {
                             case 'open-details': {
                                 if (!pid) return;
+                                // Try to find the full pokemon object in the loaded region data
+                                try {
+                                    const idStr = String(pid);
+                                    let found = null;
+                                    for (const rn of Object.keys(regionPokemon || {})) {
+                                        const list = regionPokemon[rn] || [];
+                                        for (const p of list) {
+                                            if (String(p.id) === idStr) { found = p; break; }
+                                        }
+                                        if (found) break;
+                                    }
+                                    // Persist the object for the detail page to consume (transient handoff)
+                                    if (found) {
+                                        try {
+                                            if (typeof LocalStorageCache !== 'undefined' && LocalStorageCache && typeof LocalStorageCache.set === 'function') {
+                                                LocalStorageCache.set('selectedPokemon', JSON.stringify(found));
+                                            } else {
+                                                localStorage.setItem('selectedPokemon', JSON.stringify(found));
+                                            }
+                                        } catch (e) {
+                                            try { localStorage.setItem('selectedPokemon', JSON.stringify(found)); } catch (e2) { /* ignore */ }
+                                        }
+                                    } else {
+                                        // clear any stale selectedPokemon so detail page falls back
+                                        try { localStorage.removeItem('selectedPokemon'); } catch (e) {}
+                                    }
+                                } catch (err) { console.warn('open-details handoff failed', err); }
                                 window.open(`pokemon-detail.html?id=${pid}`, '_blank', 'noopener,noreferrer');
                                 break;
                             }

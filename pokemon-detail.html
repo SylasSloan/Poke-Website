@@ -270,8 +270,26 @@
                 return;
             }
 
-            const allPokemon = await loadPokemonData();
-            const pokemon = allPokemon.find(entry => String(entry.id) === String(pokemonId));
+            // Prefer the transiently-passed Pokémon object (set by Test Site) when present
+            let pokemon = null;
+            try {
+                const raw = localStorage.getItem('selectedPokemon');
+                if (raw) {
+                    try {
+                        const parsed = JSON.parse(raw);
+                        if (parsed && String(parsed.id) === String(pokemonId)) {
+                            pokemon = parsed;
+                            try { localStorage.removeItem('selectedPokemon'); } catch (e) {}
+                        }
+                    } catch (e) { console.warn('selectedPokemon parse failed', e); }
+                }
+            } catch (e) { console.warn('reading selectedPokemon failed', e); }
+
+            if (!pokemon) {
+                const allPokemon = await loadPokemonData();
+                pokemon = allPokemon.find(entry => String(entry.id) === String(pokemonId));
+            }
+
             if (!pokemon) {
                 statusEl.textContent = 'Pokémon not found.';
                 return;
