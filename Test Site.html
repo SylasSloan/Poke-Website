@@ -1678,9 +1678,34 @@
                     }
                 }
                 // Updates the appearance of region tabs (selected/unselected)
-        function updateTabsUI() {
-                    const tabsDiv = document.getElementById('region-tabs');
-                    const tabs = Array.from(tabsDiv.querySelectorAll('.region-tab'));
+                function getOrCreateRegionTabs() {
+                    let tabsDiv = document.getElementById('region-tabs');
+                    if (tabsDiv) return tabsDiv;
+                    // Create a lightweight tabs container and insert it near the top toolbar
+                    try {
+                        tabsDiv = document.createElement('div');
+                        tabsDiv.id = 'region-tabs';
+                        tabsDiv.className = 'region-tabs';
+                        const toolbar = document.querySelector('.top-toolbar');
+                        if (toolbar && toolbar.parentNode) {
+                            toolbar.parentNode.insertBefore(tabsDiv, toolbar.nextSibling);
+                        } else if (document.querySelector('.page-with-right')) {
+                            const pw = document.querySelector('.page-with-right');
+                            pw.insertBefore(tabsDiv, pw.firstChild);
+                        } else {
+                            document.body.insertBefore(tabsDiv, document.body.firstChild);
+                        }
+                    } catch (e) {
+                        console.warn('Failed to create region-tabs container', e);
+                    }
+                    return document.getElementById('region-tabs');
+                }
+
+                // Updates the appearance of region tabs (selected/unselected)
+                function updateTabsUI() {
+                            const tabsDiv = getOrCreateRegionTabs();
+                            if (!tabsDiv) return;
+                            const tabs = Array.from(tabsDiv.querySelectorAll('.region-tab'));
                     tabs.forEach(tab => {
                         const regionName = tab.getAttribute('data-region');
                         if (!regionName) return; // Skip action buttons
@@ -1956,9 +1981,9 @@
 
         // --- Data bootstrapping helpers to run without a server ---
         function processPokemonData(allPokemon) {
-            // Get the region tabs container
-            const tabsDiv = document.getElementById('region-tabs');
-            tabsDiv.innerHTML = '';
+            // Get or create the region tabs container
+            const tabsDiv = getOrCreateRegionTabs();
+            if (tabsDiv) tabsDiv.innerHTML = '';
             console.log('Loaded dataset:', allPokemon && allPokemon.length);
             // Render the types panel (right column)
             try { renderTypesPanel(allPokemon); } catch (e) { console.warn('renderTypesPanel failed', e); }
@@ -1998,7 +2023,7 @@
             regions = Object.keys(regionGroups).map(region => ({ name: region }));
             regionPokemon = regionGroups;
             // Render region actions and filter tabs at the top
-            tabsDiv.innerHTML = '';
+            if (tabsDiv) tabsDiv.innerHTML = '';
             // Action buttons: Clear All / Select All
             const clearBtn = document.createElement('button');
             clearBtn.className = 'region-tab region-action';
@@ -2010,8 +2035,10 @@
             selectAllBtn.textContent = 'Select All';
             selectAllBtn.title = 'Select all generations';
             selectAllBtn.addEventListener('click', () => selectAllRegions());
-            tabsDiv.appendChild(clearBtn);
-            tabsDiv.appendChild(selectAllBtn);
+            if (tabsDiv) {
+                tabsDiv.appendChild(clearBtn);
+                tabsDiv.appendChild(selectAllBtn);
+            }
             // Region tabs
             regions.forEach(region => {
                 // Use formatted generation name for tab label
@@ -2035,7 +2062,7 @@
                         toggleRegion(rn);
                     }
                 });
-                tabsDiv.appendChild(btn);
+                if (tabsDiv) tabsDiv.appendChild(btn);
             });
             // Restore previously selected regions if available
             try {
@@ -2050,8 +2077,9 @@
             }
             updateTabsUI();
             // Keyboard navigation for tabs: ArrowLeft/ArrowRight/Home/End to move focus, Enter/Space to toggle
-            tabsDiv.addEventListener('keydown', (e) => {
-                const focusable = Array.from(tabsDiv.querySelectorAll('.region-tab')).filter(b => !b.classList.contains('region-action'));
+            if (tabsDiv) {
+                tabsDiv.addEventListener('keydown', (e) => {
+                    const focusable = Array.from(tabsDiv.querySelectorAll('.region-tab')).filter(b => !b.classList.contains('region-action'));
                 if (!focusable.length) return;
                 const idx = focusable.indexOf(document.activeElement);
                 if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
