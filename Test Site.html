@@ -2183,9 +2183,23 @@
                 const reader = new FileReader();
                 reader.onload = () => {
                     try {
-                        const data = JSON.parse(String(reader.result));
-                        if (!Array.isArray(data)) throw new Error('JSON root must be an array');
-                        processPokemonData(data);
+                        const parsed = JSON.parse(String(reader.result));
+                        let dataArray = null;
+                        if (Array.isArray(parsed)) {
+                            dataArray = parsed;
+                        } else if (parsed && typeof parsed === 'object') {
+                            // Common wrappers: { pokemon: [...] } or { data: [...] } or similar.
+                            // Pick the first array-valued property we find.
+                            for (const k of Object.keys(parsed)) {
+                                if (Array.isArray(parsed[k])) { dataArray = parsed[k]; break; }
+                            }
+                        }
+                        if (!Array.isArray(dataArray)) {
+                            alert('Invalid JSON structure. Select the project\'s pokemon-full-data.json (an array or wrapper containing the array).');
+                            console.error(new Error('JSON did not contain an array at root or as a property'));
+                            return;
+                        }
+                        processPokemonData(dataArray);
                     } catch (e) {
                         alert('Invalid JSON file. Please select the pokemon-full-data.json file.');
                         console.error(e);
