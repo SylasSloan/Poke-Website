@@ -899,7 +899,9 @@
             <button id="nav-toggle" class="btn" aria-expanded="false" title="Toggle navigation">☰</button>
         </div>
 
-    <div id="region-tabs" role="toolbar" aria-label="Region tabs"><!-- region tabs populated by JS --></div>
+        <div style="display:flex;align-items:center;justify-content:center;flex:1;">
+            <div style="font-size:1.2rem;font-weight:800;color:var(--primary);letter-spacing:0.08em;text-transform:uppercase;">Pokemon Database</div>
+        </div>
 
         <div class="toolbar-right" style="display:flex;align-items:center;gap:8px;">
             <div style="position:relative;display:flex;align-items:center;gap:6px;">
@@ -919,7 +921,6 @@
                 </div>
                 <input id="progress-import-file" type="file" accept="application/json" style="display:none;" />
             </div>
-            <div id="global-progress" title="Seen / Caught summary" aria-live="polite"></div>
         </div>
     </div>
     <!-- search moved into the left sidebar for a cleaner top area -->
