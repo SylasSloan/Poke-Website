@@ -2156,17 +2156,27 @@
             helper.style.padding = '18px';
             helper.style.textAlign = 'center';
             helper.innerHTML = `
-                <div style="font-size:1.1em;font-weight:700;color:#ef5350;margin-bottom:8px;">Couldn't auto-load Pokémon data.</div>
-                <div style="color:#555;margin-bottom:12px;">Open file directly? Load <code>pokemon-full-data.json</code> below to continue.</div>
+                <div style="font-size:1.2em;font-weight:800;color:#ef5350;margin-bottom:12px;">Couldn't auto-load Pokémon data</div>
+                <div style="color:#333;margin-bottom:14px;">To continue, please select the <strong>pokemon-full-data.json</strong> file from this project's <em>json</em> folder. This file contains the database the app needs.</div>
                 <input id="data-file" type="file" accept="application/json,.json" style="display:none;" />
-                <button id="choose-file" class="region-tab region-action" style="font-size:1em;">Choose JSON file…</button>
-                <div style="margin-top:8px;color:#777;font-size:0.9em;">Tip: You can also place a <code>pokemon-data.js</code> file that sets <code>window.ALL_POKEMON = [...]</code> next to this HTML.</div>
+                <div style="display:flex;gap:12px;align-items:center;justify-content:center;margin-bottom:12px;">
+                    <button id="choose-file" class="region-tab region-action" style="font-size:1.05em;padding:12px 18px;border-radius:12px;">Choose JSON file…</button>
+                    <button id="use-js-data" class="region-tab" style="font-size:0.95em;padding:8px 12px;border-radius:8px;">I have pokemon-data.js (offline)</button>
+                </div>
+                <div style="color:#777;font-size:0.9em;">Tip: You can also drop a <code>pokemon-data.js</code> file that sets <code>window.ALL_POKEMON = [...]</code> next to this HTML.</div>
             `;
             container.innerHTML = '';
             container.appendChild(helper);
             const input = helper.querySelector('#data-file');
             const btn = helper.querySelector('#choose-file');
+            const useJsBtn = helper.querySelector('#use-js-data');
             btn.onclick = () => input.click();
+            if (useJsBtn) useJsBtn.onclick = () => {
+                // Try to load an offline JS data file if the user indicates they have one
+                tryLoadScriptDataThenFallback();
+            };
+            // Make the choose button obvious and focus it so users see the fallback action
+            try { btn.focus(); btn.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {}
             input.onchange = () => {
                 const file = input.files && input.files[0];
                 if (!file) return;
