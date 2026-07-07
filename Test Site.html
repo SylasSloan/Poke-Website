@@ -1074,6 +1074,7 @@
     let favorites = new Set();
     // favorites filter state (when true, only favorites are shown)
     let favoritesFilterOn = false;
+    let browseMode = 'all';
         
     // Load favorites from localStorage into an in-memory Set. This function tolerates
     // invalid or missing data by falling back to an empty set.
@@ -1134,6 +1135,14 @@
         }
     }
 
+    function setBrowseMode(mode) {
+        const normalized = ['all', 'favorites', 'seen', 'caught'].includes(mode) ? mode : 'all';
+        browseMode = normalized;
+        favoritesFilterOn = normalized === 'favorites';
+        try { renderPokemonSafe(); } catch (e) { console.warn('Failed to apply browse mode', e); }
+        try { renderSideNav(); } catch (e) { console.warn('Failed to update sidebar browse state', e); }
+    }
+
     /**
      * renderPokemon()
      * Main rendering function. Responsible for building the DOM for all selected regions
@@ -1161,6 +1170,7 @@
                     const listDiv = document.getElementById('pokemon-list');
                     const favoritesFilter = document.getElementById('favorites-filter');
                     const favFilterOn = (favoritesFilter && favoritesFilter.getAttribute('aria-pressed') === 'true') || favoritesFilterOn;
+                    const currentBrowseMode = browseMode || (favFilterOn ? 'favorites' : 'all');
                     const hasTypeFilter = selectedTypes && selectedTypes.size > 0;
                     const hasSearchQuery = searchQuery && searchQuery.length > 0;
                     const selectedTypesArray = hasTypeFilter ? Array.from(selectedTypes) : [];
@@ -1244,8 +1254,9 @@
                         
                         // Pre-filter Pokémon to avoid repeated DOM queries and computations
                         const filteredPokemon = regionPokemon[regionName].filter(pokemon => {
-                            // Favorites filter
-                            if (favFilterOn && !favorites.has(Number(pokemon.id))) return false;
+                            if (currentBrowseMode === 'favorites' && !favorites.has(Number(pokemon.id))) return false;
+                            if (currentBrowseMode === 'seen' && !((progress[pokemon.region]?.seen || []).includes(pokemon.id))) return false;
+                            if (currentBrowseMode === 'caught' && !((progress[pokemon.region]?.caught || []).includes(pokemon.id))) return false;
                             
                             // Type filters
                             if (hasTypeFilter) {
@@ -1585,6 +1596,28 @@
                     const gens = (Array.isArray(selectedRegions) && selectedRegions.length)
                         ? selectedRegions.slice()
                         : (Array.isArray(regions) ? regions.map(r => r.name) : []);
+
+                    const quickViewsSection = document.createElement('div');
+                    quickViewsSection.className = 'side-section';
+                    const quickViewsTitle = document.createElement('div');
+                    quickViewsTitle.className = 'side-section-title';
+                    quickViewsTitle.textContent = 'Quick views';
+                    quickViewsSection.appendChild(quickViewsTitle);
+
+                    const quickViewButtons = [
+                        { mode: 'all', label: 'All Pokémon' },
+                        { mode: 'favorites', label: 'Favorites' },
+                        { mode: 'seen', label: 'Seen' },
+                        { mode: 'caught', label: 'Caught' }
+                    ];
+                    quickViewButtons.forEach(item => {
+                        const btn = document.createElement('button');
+                        btn.className = 'side-nav-item' + (browseMode === item.mode ? ' active' : '');
+                        btn.textContent = item.label;
+                        btn.onclick = () => setBrowseMode(item.mode);
+                        quickViewsSection.appendChild(btn);
+                    });
+                    container.appendChild(quickViewsSection);
 
                     const generationsSection = document.createElement('div');
                     generationsSection.className = 'side-section';
@@ -2609,9 +2642,7 @@
                     if (action === 'export') { try { exportProgress(); } catch (err) { alert('Export failed'); } }
                     else if (action === 'import') { const inp = document.getElementById('progress-import-file'); if (inp) inp.click(); }
                     else if (action === 'favorites') {
-                        // Toggle internal favorites filter state and rerender
-                        favoritesFilterOn = !favoritesFilterOn;
-                        try { renderPokemon(); } catch (e) {}
+                        setBrowseMode(favoritesFilterOn ? 'all' : 'favorites');
                     }
                     else if (action === 'cache') {
                         try { populateCacheModal(); const cacheModalEl = document.getElementById('cache-modal'); if (cacheModalEl) { cacheModalEl.style.display = 'flex'; cacheModalEl.classList.add('open'); } } catch (e) { alert('Failed to open cache modal'); }
