@@ -25,5 +25,5 @@ Local testing
 
 Notes
 
-- If you change storage key names, update `docs/STORAGE_KEYS.md` and any comments in `Test Site.html`.
+- If you change storage key names, update `docs/STORAGE_KEYS.md` and any comments in `index.html`.
 

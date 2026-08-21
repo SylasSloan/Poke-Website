@@ -2,7 +2,7 @@ Pokémon Database — Quick Start
 
 This project is a single-file Pokémon browser. The app loads data from
 `json/pokemon-full-data.json` and displays a browsable list in
-`Test Site.html`. If you open the site via `file://` the browser may block
+`index.html`. If you open the site via `file://` the browser may block
 network-like `fetch()` calls; running a local HTTP server is the simplest fix.
 
 Quick start — serve locally (recommended)
@@ -13,7 +13,7 @@ Quick start — serve locally (recommended)
 # from the project folder
 python -m http.server 8000
 # then open in your browser:
-http://localhost:8000/Test%20Site.html
+http://localhost:8000/index.html
 ```
 
 - With Node (no install if you use npx):
@@ -21,7 +21,7 @@ http://localhost:8000/Test%20Site.html
 ```bash
 npx http-server -p 8000
 # then open in your browser:
-http://localhost:8000/Test%20Site.html
+http://localhost:8000/index.html
 ```
 
 - VS Code Live Server: open the folder in VS Code and use "Open with Live Server".
@@ -31,7 +31,7 @@ Fallback when running from file:// (no server)
 - If the page shows "Couldn't auto-load Pokémon data", click the prominent
   "Choose JSON file…" button and select `json/pokemon-full-data.json` from
   this repository.
-- Alternatively, drop a file named `pokemon-data.js` next to `Test Site.html`
+- Alternatively, drop a file named `pokemon-data.js` next to `index.html`
   that sets `window.ALL_POKEMON = [...]` (an array) and click "I have pokemon-data.js (offline)".
 
 Using the detail page

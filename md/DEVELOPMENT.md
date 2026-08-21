@@ -11,7 +11,7 @@ Prerequisites
 
 Running locally
 
-1. Open `Test Site.html` in your browser. For convenience, place `json/pokemon-full-data.json` next to the HTML file and the app will attempt to load it.
+1. Open `index.html` in your browser. For convenience, place `json/pokemon-full-data.json` next to the HTML file and the app will attempt to load it.
 2. If you prefer a simple local server, run (from a shell) in the project folder:
 
 ```powershell
@@ -19,11 +19,11 @@ Running locally
 python -m http.server 8000
 ```
 
-and open `http://localhost:8000/Test%20Site.html` in your browser.
+and open `http://localhost:8000/index.html` in your browser.
 
 Editing & live reload
 
-- The file is a single-file app. Edit `Test Site.html` and refresh the browser to see changes.
+- The file is a single-file app. Edit `index.html` and refresh the browser to see changes.
 - For faster iteration add a simple live-reload workflow using an editor extension or a small server that reloads on file changes.
 
 Key areas to understand before making changes

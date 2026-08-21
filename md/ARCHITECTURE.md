@@ -2,11 +2,11 @@ Architecture — Pokémon Site
 
 Purpose
 
-This document explains the structure, key modules, design choices, and runtime behavior of the Pokémon single-file web app (`Test Site.html`). It's intended for developers who want to maintain or extend the application.
+This document explains the structure, key modules, design choices, and runtime behavior of the Pokémon single-file web app (`index.html`). It's intended for developers who want to maintain or extend the application.
 
 High-level structure
 
-- Single-file app: `Test Site.html` contains HTML, CSS, and JavaScript. The app uses the DOM API without frameworks to remain portable and simple.
+- Single-file app: `index.html` contains HTML, CSS, and JavaScript. The app uses the DOM API without frameworks to remain portable and simple.
 - Data: Pokémon data is loaded from `js/pokemon-data.js` (optional global `ALL_POKEMON`) or `json/pokemon-full-data.json` via fetch or file picker fallback.
 - Rendering: The app renders region sections and a responsive grid of Pokémon cards using DocumentFragment for batch updates.
 
@@ -63,5 +63,5 @@ Extending the app
 
 Files to inspect
 
-- `Test Site.html` — read top-to-bottom. Key symbols to search for: `StorageManager`, `renderPokemon`, `renderTypesPanel`, `LazyImageObserver`, `LocalStorageCache`, `Utils`, `markSeenCaught()`.
+- `index.html` — read top-to-bottom. Key symbols to search for: `StorageManager`, `renderPokemon`, `renderTypesPanel`, `LazyImageObserver`, `LocalStorageCache`, `Utils`, `markSeenCaught()`.
 

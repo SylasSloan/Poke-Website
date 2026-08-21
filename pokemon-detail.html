@@ -140,7 +140,7 @@
 <body>
     <div class="page">
         <div class="topbar">
-            <a class="back-link" href="Test Site.html">← Back to Pokémon database</a>
+            <a class="back-link" href="index.html">← Back to Pokémon database</a>
             <div class="status" id="status">Loading details…</div>
         </div>
         <div class="card" id="detail-card" hidden>
@@ -270,7 +270,7 @@
                 return;
             }
 
-            // Prefer the transiently-passed Pokémon object (set by Test Site) when present
+            // Prefer the transiently-passed Pokémon object (set by index.html) when present
             let pokemon = null;
             try {
                 const raw = localStorage.getItem('selectedPokemon');
