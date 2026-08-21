@@ -4,7 +4,7 @@ Thank you for contributing! This project prefers small, focused changes. Below a
 
 Before you start
 
-- Read `docs/DEVELOPMENT.md` and `docs/ARCHITECTURE.md` to understand core patterns.
+- Read `DEVELOPMENT.md` and `ARCHITECTURE.md` to understand core patterns.
 - Keep changes localized: this app is a single-file app, so large sweeping changes are difficult to review.
 
 Style & Quality
@@ -25,5 +25,5 @@ Local testing
 
 Notes
 
-- If you change storage key names, update `docs/STORAGE_KEYS.md` and any comments in `index.html`.
+- If you change storage key names, update `STORAGE_KEYS.md` and any comments in `index.html`.
 

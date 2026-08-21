@@ -33,6 +33,8 @@ Fallback when running from file:// (no server)
   this repository.
 - Alternatively, drop a file named `pokemon-data.js` next to `index.html`
   that sets `window.ALL_POKEMON = [...]` (an array) and click "I have pokemon-data.js (offline)".
+  Generate it from the JSON with `python python/generate_pokemon_data_js.py json/pokemon-full-data.json js/pokemon-data.js`
+  (this file is gitignored since it's a generated duplicate of the JSON dataset).
 
 Using the detail page
 

@@ -1,0 +1,3 @@
+# Generated datasets — regenerate with python/generate_pokemon_data_js.py
+js/pokemon-data.js
+js/pokemon-data-local.js

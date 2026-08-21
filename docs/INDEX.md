@@ -19,6 +19,7 @@ Docs:
 - `docs/DEVELOPMENT.md` — running and contributing.
 - `docs/STORAGE_KEYS.md` — localStorage key reference.
 - `docs/USAGE.md` — user-facing usage tips and keyboard shortcuts.
+- `docs/CONTRIBUTING.md` — guidance for contributors.
 
 Where to start editing
 

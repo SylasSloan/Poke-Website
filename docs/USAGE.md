@@ -18,6 +18,6 @@ Keyboard shortcuts
 Troubleshooting
 
 - Sprites don't load when opening via file:// — some browsers block fetch under file://. Use the embedded `js/pokemon-data.js` or run a local server: `python -m http.server`.
-- Cross-tab edits not showing up — the app listens to `storage` events and should update within 100ms after changes; ensure other tabs write to the same keys (see `docs/STORAGE_KEYS.md`).
+- Cross-tab edits not showing up — the app listens to `storage` events and should update within 100ms after changes; ensure other tabs write to the same keys (see `STORAGE_KEYS.md`).
 - Import fails — validate the JSON structure is an object keyed by region containing `seen` and `caught` arrays.
 
