@@ -232,7 +232,12 @@
             rows.forEach(([label, value]) => {
                 const row = document.createElement('div');
                 row.className = 'stat-row';
-                row.innerHTML = `<strong>${label}</strong><span>${value ?? '—'}</span>`;
+                const strong = document.createElement('strong');
+                strong.textContent = label;
+                const span = document.createElement('span');
+                span.textContent = value ?? '—';
+                row.appendChild(strong);
+                row.appendChild(span);
                 container.appendChild(row);
             });
         }
@@ -313,9 +318,23 @@
             } else {
                 (pokemon.abilities || []).forEach(ability => abilities.push(titleCase(ability)));
             }
-            document.getElementById('abilities').innerHTML = abilities.length
-                ? `<div>${abilities.map(item => `<span class="pill">${item}</span>`).join('')}</div>`
-                : '<div class="muted">No abilities recorded.</div>';
+            const abilitiesContainer = document.getElementById('abilities');
+            abilitiesContainer.textContent = '';
+            if (abilities.length) {
+                const wrap = document.createElement('div');
+                abilities.forEach(item => {
+                    const pill = document.createElement('span');
+                    pill.className = 'pill';
+                    pill.textContent = item;
+                    wrap.appendChild(pill);
+                });
+                abilitiesContainer.appendChild(wrap);
+            } else {
+                const muted = document.createElement('div');
+                muted.className = 'muted';
+                muted.textContent = 'No abilities recorded.';
+                abilitiesContainer.appendChild(muted);
+            }
 
             try {
                 const pokeApiRes = await fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonId}`);

@@ -1027,7 +1027,16 @@
             createToggleChip(type, isActive, iconSrc, onClick) {
                 const chip = document.createElement('div');
                 chip.className = `toggle-chip ${type}${isActive ? ' active' : ''}`;
-                chip.innerHTML = `<span class='icon'><img src='${iconSrc}' alt=''></span><span>${type === 'seen' ? 'Seen' : 'Caught'}</span>`;
+                const icon = document.createElement('span');
+                icon.className = 'icon';
+                const img = document.createElement('img');
+                img.src = iconSrc;
+                img.alt = '';
+                icon.appendChild(img);
+                const label = document.createElement('span');
+                label.textContent = type === 'seen' ? 'Seen' : 'Caught';
+                chip.appendChild(icon);
+                chip.appendChild(label);
                 if (typeof onClick === 'function') chip.onclick = onClick;
                 return chip;
             },
