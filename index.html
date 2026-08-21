@@ -982,13 +982,24 @@
                     return value;
                 } catch { return null; }
             },
+            // Returns true if the value was actually persisted to localStorage.
+            // The in-memory cache is only updated on success, so a failed write
+            // (e.g. quota exceeded) doesn't leave callers believing it saved.
             set(key, value) {
-                this.cache.set(key, value);
-                try { localStorage.setItem(key, value); } catch {}
+                try {
+                    localStorage.setItem(key, value);
+                    this.cache.set(key, value);
+                    return true;
+                } catch {
+                    return false;
+                }
             },
+            // Forgets the in-memory copy only — this does NOT delete the key from
+            // localStorage. Both current callers (StorageManager.invalidateProgress
+            // and the cross-tab `storage` handler) use this to mean "my cached copy
+            // is stale, re-read on next get()", not "delete this data".
             remove(key) {
                 this.cache.delete(key);
-                try { localStorage.removeItem(key); } catch {}
             }
         };
 
@@ -1189,8 +1200,8 @@
                     if (globalDiv) {
                         const regionKeys = Object.keys(regionPokemon || {});
                         const totalAll = regionKeys.reduce((sum, rn) => sum + (regionPokemon[rn]?.length || 0), 0);
-                        const seenAll = regionKeys.reduce((sum, rn) => sum + ((progress[rn]?.seen || []).length), 0);
-                        const caughtAll = regionKeys.reduce((sum, rn) => sum + ((progress[rn]?.caught || []).length), 0);
+                        const seenAll = regionKeys.reduce((sum, rn) => sum + (progress[rn]?.seen?.size || 0), 0);
+                        const caughtAll = regionKeys.reduce((sum, rn) => sum + (progress[rn]?.caught?.size || 0), 0);
                         if (totalAll > 0) {
                             // Use utility function for cleaner progress bar creation
                             globalDiv.innerHTML = `
@@ -1229,8 +1240,8 @@
                         regionSection.setAttribute('aria-labelledby', regionTitle.id);
                         regionSection.appendChild(regionTitle);
                         const total = regionPokemon[regionName].length;
-                        const seen = (progress[regionName]?.seen || []).length;
-                        const caught = (progress[regionName]?.caught || []).length;
+                        const seen = progress[regionName]?.seen?.size || 0;
+                        const caught = progress[regionName]?.caught?.size || 0;
                         const progressContainer = document.createElement('div');
                         progressContainer.className = 'progress-container';
                         // Use utility function for consistent progress bar creation
@@ -1265,8 +1276,8 @@
                         // Pre-filter Pokémon to avoid repeated DOM queries and computations
                         const filteredPokemon = regionPokemon[regionName].filter(pokemon => {
                             if (currentBrowseMode === 'favorites' && !favorites.has(Number(pokemon.id))) return false;
-                            if (currentBrowseMode === 'seen' && !((progress[pokemon.region]?.seen || []).includes(pokemon.id))) return false;
-                            if (currentBrowseMode === 'caught' && !((progress[pokemon.region]?.caught || []).includes(pokemon.id))) return false;
+                            if (currentBrowseMode === 'seen' && !(progress[pokemon.region]?.seen?.has(pokemon.id))) return false;
+                            if (currentBrowseMode === 'caught' && !(progress[pokemon.region]?.caught?.has(pokemon.id))) return false;
                             
                             // Type filters
                             if (hasTypeFilter) {
@@ -1346,10 +1357,10 @@
                                 // Status badges overlay - use utility function
                                 const badges = document.createElement('div');
                                 badges.className = 'status-badges';
-                                if (progress[pokemon.region]?.seen?.includes(pokemon.id)) {
+                                if (progress[pokemon.region]?.seen?.has(pokemon.id)) {
                                     badges.appendChild(Utils.createStatusBadge('seen', 'Seen', true));
                                 }
-                                if (progress[pokemon.region]?.caught?.includes(pokemon.id)) {
+                                if (progress[pokemon.region]?.caught?.has(pokemon.id)) {
                                     badges.appendChild(Utils.createStatusBadge('caught', 'Caught', true));
                                 }
                                 card.appendChild(badges);
@@ -1561,8 +1572,8 @@
                             // Toggle chips using utility function
                             const toggleRow = document.createElement('div');
                             toggleRow.className = 'toggle-row';
-                            const isSeen = !!(progress[pokemon.region]?.seen?.includes(pokemon.id));
-                            const isCaught = !!(progress[pokemon.region]?.caught?.includes(pokemon.id));
+                            const isSeen = !!(progress[pokemon.region]?.seen?.has(pokemon.id));
+                            const isCaught = !!(progress[pokemon.region]?.caught?.has(pokemon.id));
                             
                             const seenChip = Utils.createToggleChip('seen', isSeen, 'png/wide-lens.png');
                             seenChip.setAttribute('data-action', 'toggle-seen');
@@ -2606,6 +2617,10 @@
                                 result = parsed;
                             }
                             localStorage.setItem('pokemonProgress', JSON.stringify(result));
+                            // This writes directly to localStorage rather than through StorageManager,
+                            // so the cached (Set-based) progress must be invalidated or the next
+                            // render would keep showing pre-import data from the stale cache.
+                            StorageManager.invalidateProgress();
                             resolve(result);
                         } catch (e) { reject(e); }
                     };
@@ -2618,9 +2633,13 @@
             const exportBtn = document.getElementById('export-progress');
             const importBtn = document.getElementById('import-progress');
             const importInput = document.getElementById('progress-import-file');
+            // Note: #export-progress / #import-progress buttons aren't present in the
+            // current markup (export/import are triggered from the "more actions" menu
+            // instead) — the change listener must not be gated on importBtn existing,
+            // or the file input's change event is silently never handled.
             if (exportBtn) exportBtn.addEventListener('click', exportProgress);
-            if (importBtn && importInput) {
-                importBtn.addEventListener('click', () => importInput.click());
+            if (importBtn) importBtn.addEventListener('click', () => importInput && importInput.click());
+            if (importInput) {
                 importInput.addEventListener('change', (e) => {
                     const f = importInput.files && importInput.files[0];
                     if (!f) return;
@@ -2917,24 +2936,48 @@
                 this._progressCache = null;
                 LocalStorageCache.remove('pokemonProgress');
             },
+            // Progress is cached in memory as { seen: Set<number>, caught: Set<number> }
+            // per region for O(1) membership checks on the hot render/filter path.
+            // The on-disk format stays plain arrays for backwards/export compatibility.
             getProgress() {
                 try {
                     if (this._progressCache !== null) return this._progressCache;
                     const raw = LocalStorageCache.get('pokemonProgress');
                     const parsed = raw ? JSON.parse(raw) : {};
-                    this._progressCache = parsed;
-                    return parsed;
+                    const progress = {};
+                    for (const region in parsed) {
+                        progress[region] = {
+                            seen: new Set(Array.isArray(parsed[region]?.seen) ? parsed[region].seen : []),
+                            caught: new Set(Array.isArray(parsed[region]?.caught) ? parsed[region].caught : [])
+                        };
+                    }
+                    this._progressCache = progress;
+                    return progress;
                 } catch {
                     this._progressCache = {};
                     return this._progressCache;
                 }
             },
 
+            // Persists `progress` (Set-based, as returned by getProgress()) to localStorage
+            // as plain arrays. Only updates the in-memory cache once the write actually
+            // succeeds, so a failed save (e.g. quota exceeded) doesn't get treated as saved.
             saveProgress(progress) {
+                let serialized;
                 try {
-                    this._progressCache = progress;
-                    LocalStorageCache.set('pokemonProgress', JSON.stringify(progress));
-                } catch (e) { /* noop */ }
+                    serialized = JSON.stringify(progress, (key, value) => value instanceof Set ? Array.from(value) : value);
+                } catch (e) {
+                    console.warn('Failed to serialize progress', e);
+                    alert('Failed to save your progress: the data could not be serialized.');
+                    return false;
+                }
+                if (!LocalStorageCache.set('pokemonProgress', serialized)) {
+                    console.warn('Failed to persist pokemonProgress to localStorage');
+                    alert('Failed to save your progress (storage may be full or unavailable). Your latest change may be lost on reload.');
+                    return false;
+                }
+                this._progressCache = progress;
+                return true;
             },
             
             // Region selection operations
@@ -2991,14 +3034,10 @@
             StorageManager.saveProgress(progress);
         }
         function ensureRegionProgress(progress, regionName) {
-            if (!progress[regionName]) progress[regionName] = { seen: [], caught: [] };
-            if (!Array.isArray(progress[regionName].seen)) progress[regionName].seen = [];
-            if (!Array.isArray(progress[regionName].caught)) progress[regionName].caught = [];
+            if (!progress[regionName]) progress[regionName] = { seen: new Set(), caught: new Set() };
+            if (!(progress[regionName].seen instanceof Set)) progress[regionName].seen = new Set(progress[regionName].seen || []);
+            if (!(progress[regionName].caught instanceof Set)) progress[regionName].caught = new Set(progress[regionName].caught || []);
             return progress[regionName];
-        }
-        function toggleInArray(arr, value) {
-            const idx = arr.indexOf(value);
-            if (idx >= 0) arr.splice(idx, 1); else arr.push(value);
         }
     /**
      * markSeenCaught(regionName, pokemonId, isCaught)
@@ -3020,20 +3059,20 @@
             const entry = ensureRegionProgress(progress, regionName);
             if (isCaught) {
                 // Toggle caught
-                if (entry.caught.includes(id)) {
-                    entry.caught = entry.caught.filter(x => x !== id);
+                if (entry.caught.has(id)) {
+                    entry.caught.delete(id);
                     // Keep seen as-is when uncatching
                 } else {
-                    entry.caught.push(id);
-                    if (!entry.seen.includes(id)) entry.seen.push(id); // caught implies seen
+                    entry.caught.add(id);
+                    entry.seen.add(id); // caught implies seen
                 }
             } else {
                 // Toggle seen; removing seen also removes caught for consistency
-                if (entry.seen.includes(id)) {
-                    entry.seen = entry.seen.filter(x => x !== id);
-                    if (entry.caught.includes(id)) entry.caught = entry.caught.filter(x => x !== id);
+                if (entry.seen.has(id)) {
+                    entry.seen.delete(id);
+                    entry.caught.delete(id);
                 } else {
-                    entry.seen.push(id);
+                    entry.seen.add(id);
                 }
             }
             saveProgress(progress);
