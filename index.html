@@ -1179,9 +1179,27 @@
      * - Filters data in-memory before DOM creation to minimize node churn
      */
     // Performance-monitored render function
+    // Browse mode currently in effect (mirrors #favorites-filter / browseMode). Shared by
+    // renderPokemon's filter and by the single-card DOM updates below it in this file, so
+    // "is this card still visible" can never disagree between the two code paths.
+    function getCurrentBrowseMode() {
+        const favoritesFilter = document.getElementById('favorites-filter');
+        const favFilterOn = (favoritesFilter && favoritesFilter.getAttribute('aria-pressed') === 'true') || favoritesFilterOn;
+        return browseMode || (favFilterOn ? 'favorites' : 'all');
+    }
+
+    // Whether `pokemon` belongs in the given browse mode. Shared for the same reason as
+    // getCurrentBrowseMode() above.
+    function matchesBrowseMode(mode, pokemon, progress) {
+        if (mode === 'favorites') return favorites.has(Number(pokemon.id));
+        if (mode === 'seen') return !!(progress[pokemon.region]?.seen?.has(pokemon.id));
+        if (mode === 'caught') return !!(progress[pokemon.region]?.caught?.has(pokemon.id));
+        return true;
+    }
+
     function renderPokemon() {
             PerfMonitor.start('renderPokemon');
-            
+
             try {
                     // Cache progress data via StorageManager to avoid repeated localStorage parsing
                     const progress = StorageManager.getProgress() || {};
@@ -1189,9 +1207,7 @@
                     // Cache DOM queries and common computations
                     const globalDiv = document.getElementById('global-progress');
                     const listDiv = document.getElementById('pokemon-list');
-                    const favoritesFilter = document.getElementById('favorites-filter');
-                    const favFilterOn = (favoritesFilter && favoritesFilter.getAttribute('aria-pressed') === 'true') || favoritesFilterOn;
-                    const currentBrowseMode = browseMode || (favFilterOn ? 'favorites' : 'all');
+                    const currentBrowseMode = getCurrentBrowseMode();
                     const hasTypeFilter = selectedTypes && selectedTypes.size > 0;
                     const hasSearchQuery = searchQuery && searchQuery.length > 0;
                     const selectedTypesArray = hasTypeFilter ? Array.from(selectedTypes) : [];
@@ -1275,9 +1291,7 @@
                         
                         // Pre-filter Pokémon to avoid repeated DOM queries and computations
                         const filteredPokemon = regionPokemon[regionName].filter(pokemon => {
-                            if (currentBrowseMode === 'favorites' && !favorites.has(Number(pokemon.id))) return false;
-                            if (currentBrowseMode === 'seen' && !(progress[pokemon.region]?.seen?.has(pokemon.id))) return false;
-                            if (currentBrowseMode === 'caught' && !(progress[pokemon.region]?.caught?.has(pokemon.id))) return false;
+                            if (!matchesBrowseMode(currentBrowseMode, pokemon, progress)) return false;
                             
                             // Type filters
                             if (hasTypeFilter) {
@@ -2525,12 +2539,17 @@
                                 btn.classList.toggle('fav', favorites.has(id));
                                 btn.setAttribute('aria-pressed', favorites.has(id) ? 'true' : 'false');
                                 saveFavorites();
-                                // re-render to update any filters and counts
-                                renderPokemonSafe();
+                                // Remove the card if unfavoriting just took it out of the
+                                // current view (e.g. browsing the Favorites list); otherwise
+                                // the button state above is the only change needed.
+                                if (card && getCurrentBrowseMode() === 'favorites' && !favorites.has(id)) {
+                                    removeCardIfEmptyRegion(card);
+                                }
                                 break;
                             }
                             case 'toggle-seen': {
-                                // markSeenCaught will save and re-render
+                                // markSeenCaught updates the card and its region's progress
+                                // bar directly and saves; no full re-render needed.
                                 markSeenCaught(region || '', pid, false);
                                 break;
                             }
@@ -3039,11 +3058,77 @@
             if (!(progress[regionName].caught instanceof Set)) progress[regionName].caught = new Set(progress[regionName].caught || []);
             return progress[regionName];
         }
+    // Removes `card` from the DOM, and if that leaves its region section with no cards
+    // left, removes the whole section too — renderPokemon() never renders a region
+    // section with zero matching Pokémon, so a single-card update must match that.
+    function removeCardIfEmptyRegion(card) {
+        const regionSection = card.closest('.region-section');
+        card.remove();
+        if (regionSection && !regionSection.querySelector('.pokemon-card')) {
+            regionSection.remove();
+        }
+    }
+
+    // Applies `current`/`total` to an already-rendered progress bar's fill width and
+    // label without touching the icon, so callers avoid rebuilding markup for a
+    // single-number change.
+    function setProgressBarValues(bar, current, total) {
+        if (!bar) return;
+        const pct = total > 0 ? Math.round(current / total * 100) : 0;
+        const fill = bar.querySelector('.progress-fill');
+        const text = bar.querySelector('.progress-text');
+        if (fill) fill.style.width = pct + '%';
+        if (text) text.textContent = `${current}/${total}`;
+    }
+
+    function updateRegionProgressBar(regionName, progress) {
+        const regionSection = document.getElementById(`section-${regionName}`);
+        if (!regionSection) return;
+        const total = regionPokemon[regionName] ? regionPokemon[regionName].length : 0;
+        const seen = progress[regionName]?.seen?.size || 0;
+        const caught = progress[regionName]?.caught?.size || 0;
+        const bars = regionSection.querySelectorAll('.progress-container .progress-bar');
+        setProgressBarValues(bars[0], seen, total);
+        setProgressBarValues(bars[1], caught, total);
+    }
+
+    // Updates a single card's seen/caught badges and toggle chips in place, refreshes its
+    // region's progress bar, and removes the card from view if it no longer belongs in
+    // the current browse mode (e.g. un-marking "seen" while viewing the Seen list). This
+    // is what lets markSeenCaught() avoid a full renderPokemon() rebuild for what's
+    // otherwise a single boolean flip.
+    function applySeenCaughtToCard(regionName, id) {
+        const card = document.querySelector(`[data-card-key="${regionName}:${id}"]`);
+        if (!card) return;
+        const progress = getProgress();
+        const isSeen = !!(progress[regionName]?.seen?.has(id));
+        const isCaught = !!(progress[regionName]?.caught?.has(id));
+
+        const badgesContainer = card.querySelector('.status-badges');
+        if (badgesContainer) {
+            badgesContainer.replaceChildren();
+            if (isSeen) badgesContainer.appendChild(Utils.createStatusBadge('seen', 'Seen', true));
+            if (isCaught) badgesContainer.appendChild(Utils.createStatusBadge('caught', 'Caught', true));
+        }
+        const seenChip = card.querySelector('.toggle-chip.seen');
+        if (seenChip) seenChip.classList.toggle('active', isSeen);
+        const caughtChip = card.querySelector('.toggle-chip.caught');
+        if (caughtChip) caughtChip.classList.toggle('active', isCaught);
+
+        updateRegionProgressBar(regionName, progress);
+
+        const mode = getCurrentBrowseMode();
+        if (!matchesBrowseMode(mode, { id, region: regionName }, progress)) {
+            removeCardIfEmptyRegion(card);
+        }
+    }
+
     /**
      * markSeenCaught(regionName, pokemonId, isCaught)
      * Toggle seen/caught state for a Pokémon in a given region. This function is the
      * canonical way to mutate progress; it ensures consistency (caught => seen) and
-     * persists via StorageManager.saveProgress(). It triggers a re-render at the end.
+     * persists via StorageManager.saveProgress(). It updates that Pokémon's card (and,
+     * if needed, its region's progress bar) directly rather than re-rendering the list.
      *
      * Parameters:
      * - regionName: string (region/generation identifier)
@@ -3076,7 +3161,7 @@
                 }
             }
             saveProgress(progress);
-            renderPokemon();
+            applySeenCaughtToCard(regionName, id);
         }
     </script>
     </body>
