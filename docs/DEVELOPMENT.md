@@ -2,7 +2,7 @@ Development & Contribution Guide — Pokémon Site
 
 Purpose
 
-This guide helps contributors run, test, and extend the Pokémon single-file app.
+This guide helps contributors run, test, and extend the Pokémon app.
 
 Prerequisites
 
@@ -23,7 +23,7 @@ and open `http://localhost:8000/index.html` in your browser.
 
 Editing & live reload
 
-- The file is a single-file app. Edit `index.html` and refresh the browser to see changes.
+- No build step: edit `css/app.css` or `js/*.js` directly and refresh the browser to see changes. `index.html`'s own inline `<script>` handles page-specific wiring (see `docs/ARCHITECTURE.md` for what lives where).
 - For faster iteration add a simple live-reload workflow using an editor extension or a small server that reloads on file changes.
 
 Key areas to understand before making changes
@@ -45,6 +45,6 @@ Performance tips
 
 Commit & PR guidelines
 
-- Keep diffs small and focused; this is a single-file app so large PRs can be hard to review.
+- Keep diffs small and focused so PRs are easy to review.
 - Add descriptive comments for any structural change.
 

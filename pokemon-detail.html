@@ -193,15 +193,12 @@
         </div>
     </div>
 
+    <script src="js/text-utils.js"></script>
     <script>
         const params = new URLSearchParams(window.location.search);
         const pokemonId = params.get('id');
         const statusEl = document.getElementById('status');
         const detailCard = document.getElementById('detail-card');
-
-        function titleCase(value) {
-            return String(value || '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-        }
 
         function typeClass(type) {
             return 'type-' + String(type || '').toLowerCase();

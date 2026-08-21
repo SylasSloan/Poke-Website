@@ -1,6 +1,8 @@
 Pokémon Database — Quick Start
 
-This project is a single-file Pokémon browser. The app loads data from
+This project is a Pokémon browser with no build step: `index.html` and
+`pokemon-detail.html` load their CSS/JS from `css/app.css` and `js/*.js` via
+plain `<link>`/`<script>` tags. The app loads data from
 `json/pokemon-full-data.json` and displays a browsable list in
 `index.html`. If you open the site via `file://` the browser may block
 network-like `fetch()` calls; running a local HTTP server is the simplest fix.

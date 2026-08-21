@@ -2,15 +2,16 @@ Project index — where to find things
 
 This page helps you quickly find code areas and documentation in this project.
 
-Core runtime symbols (search `index.html` for these):
+index.html's CSS and JS are split across css/app.css and js/*.js (index.html itself
+keeps only markup plus a small inline bootstrap script — DOM wiring and the data-load
+kickoff — that isn't shared with pokemon-detail.html).
 
-- `LocalStorageCache` — cache wrapper for localStorage reads/writes.
-- `StorageManager` — central persistence manager (progress cache).
-- `renderPokemon()` — main render function (cards + regions).
-- `renderTypesPanel(allPokemon)` — builds the type filter panel.
-- `LazyImageObserver` — singleton intersection observer for images.
-- `markSeenCaught()` — toggles seen/caught and persists changes.
-- `Utils` — helper functions (createProgressBar, createStatusBadge, createToggleChip, matchesSearchQuery).
+Core runtime symbols:
+
+- `LocalStorageCache`, `StorageManager`, `markSeenCaught()` — `js/storage.js`
+- `renderPokemon()`, `renderTypesPanel(allPokemon)`, `LazyImageObserver`, `Utils` — `js/render.js`
+- Dataset loading, region grouping, type-icon detection — `js/data.js`
+- `cap()`, `titleCase()` — `js/text-utils.js` (shared with pokemon-detail.html)
 
 Docs:
 - `README.md` — overview and quick start.
@@ -23,7 +24,8 @@ Docs:
 
 Where to start editing
 
-1. Small UI tweaks: edit CSS sections at the top of `index.html`.
-2. Rendering or data changes: edit `renderPokemon()` and helper functions near the middle of the file.
-3. Persistence or cross-tab logic: edit `StorageManager` and the `storage` event handler near the bottom.
+1. Small UI tweaks: edit `css/app.css`.
+2. Rendering or data changes: edit `js/render.js` (or `js/data.js` for dataset loading/shaping).
+3. Persistence or cross-tab logic: edit `js/storage.js` (`StorageManager` and the `storage` event handler).
+4. Page-specific wiring (search input, toolbar buttons, keyboard shortcuts, the initial data-load kickoff): edit the inline `<script>` at the bottom of `index.html`.
 

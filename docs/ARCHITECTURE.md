@@ -2,11 +2,17 @@ Architecture — Pokémon Site
 
 Purpose
 
-This document explains the structure, key modules, design choices, and runtime behavior of the Pokémon single-file web app (`index.html`). It's intended for developers who want to maintain or extend the application.
+This document explains the structure, key modules, design choices, and runtime behavior of the Pokémon web app (`index.html` + `pokemon-detail.html`). It's intended for developers who want to maintain or extend the application.
 
 High-level structure
 
-- Single-file app: `index.html` contains HTML, CSS, and JavaScript. The app uses the DOM API without frameworks to remain portable and simple.
+- No build step: `css/app.css` and `js/*.js` are loaded as plain `<link>`/`<script>` tags — no bundler, works from `file://` or a local server. The app uses the DOM API without frameworks.
+- `index.html` holds the markup for the main list page, plus a small inline `<script>` at the bottom for page-specific bootstrap (DOM wiring, keyboard shortcuts, the initial data-load kickoff) that isn't shared with `pokemon-detail.html`.
+- `js/storage.js` — `LocalStorageCache`, `StorageManager`, `markSeenCaught()` and the seen/caught DOM-update helpers, favorites persistence.
+- `js/render.js` — `Utils`, `renderPokemon()`, side nav / region tabs / types panel, `LazyImageObserver`, the ability modal, browse-mode state.
+- `js/data.js` — dataset loading (embedded JS file, JSON fetch, or file-picker fallback), region grouping, type-icon detection.
+- `js/text-utils.js` — `cap()`/`titleCase()`, shared between `index.html` and `pokemon-detail.html`.
+- `pokemon-detail.html` has its own markup/CSS/inline script (a distinct design from the list page) but loads `js/text-utils.js` for `titleCase()` rather than duplicating it, and caches its dataset fallback fetch in `sessionStorage`.
 - Data: Pokémon data is loaded from `js/pokemon-data.js` (optional global `ALL_POKEMON`) or `json/pokemon-full-data.json` via fetch or file picker fallback.
 - Rendering: The app renders region sections and a responsive grid of Pokémon cards using DocumentFragment for batch updates.
 
@@ -61,7 +67,13 @@ Extending the app
 - Adding new filters: extend `Utils.matchesSearchQuery` and update `renderTypesPanel` and `renderPokemon` to respect the new filter states.
 - Adding a new persisted state: add helpers in `StorageManager` and use `LocalStorageCache` to persist the string value.
 
+Known issues (present independent of the module split, not yet fixed)
+
+- The sidebar's type filter buttons (`#types-list`, built by `renderTypesPanel`) live outside `#pokemon-list`'s DOM subtree, but the click delegation that handles `data-action="toggle-type"` is attached to `#pokemon-list`. Clicking a type filter currently does nothing.
+- A card's favorite star (`.fav-badge`) and its seen/caught status badges (`.status-badges`) can visually overlap once both seen and caught are set, making the star unclickable at that position.
+
 Files to inspect
 
-- `index.html` — read top-to-bottom. Key symbols to search for: `StorageManager`, `renderPokemon`, `renderTypesPanel`, `LazyImageObserver`, `LocalStorageCache`, `Utils`, `markSeenCaught()`.
+- `js/storage.js`, `js/render.js`, `js/data.js`, `js/text-utils.js` — see the module list above for what's in each.
+- `index.html` — markup plus the inline bootstrap `<script>` at the bottom (DOM wiring specific to this page).
 

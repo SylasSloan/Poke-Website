@@ -5,7 +5,7 @@ Thank you for contributing! This project prefers small, focused changes. Below a
 Before you start
 
 - Read `DEVELOPMENT.md` and `ARCHITECTURE.md` to understand core patterns.
-- Keep changes localized: this app is a single-file app, so large sweeping changes are difficult to review.
+- Keep changes localized to the relevant module (`css/app.css`, `js/storage.js`, `js/render.js`, `js/data.js`, `js/text-utils.js`, or a page's own inline script) so large sweeping changes are difficult to review.
 
 Style & Quality
 
