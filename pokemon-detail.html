@@ -258,11 +258,21 @@
             container.appendChild(list);
         }
 
+        // Caches the fetched dataset text in sessionStorage so refreshing this page (or
+        // navigating back to it) within the same tab doesn't re-download the ~1MB JSON
+        // every time the selectedPokemon handoff is missing.
         async function loadPokemonData() {
+            let cached = null;
+            try { cached = sessionStorage.getItem('pokemonFullDataCache'); } catch (e) { /* storage unavailable; ignore */ }
+            if (cached) {
+                try { return JSON.parse(cached); } catch (e) { /* corrupt cache; fall through to re-fetch */ }
+            }
             try {
                 const response = await fetch('./json/pokemon-full-data.json');
                 if (!response.ok) throw new Error('Unable to load local data');
-                return await response.json();
+                const text = await response.text();
+                try { sessionStorage.setItem('pokemonFullDataCache', text); } catch (e) { /* storage full/unavailable; ignore */ }
+                return JSON.parse(text);
             } catch (error) {
                 console.error(error);
                 return [];
