@@ -2104,7 +2104,8 @@
                         e.preventDefault();
                     }
                 }
-            });
+                });
+            }
             renderPokemonSafe();
             try { if (typeof detectTypeIcons === 'function') detectTypeIcons(allPokemon); } catch (e) { console.warn('detectTypeIcons failed', e); }
         }
