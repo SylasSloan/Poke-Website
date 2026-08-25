@@ -39,11 +39,11 @@ def generate(in_path: str, out_path: str):
 
 def main():
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-    default_in = os.path.join(base_dir, 'json', 'pokemon-full-data.json')
+    default_in = os.path.join(base_dir, 'json', 'pokemon-index.json')
     default_out = os.path.join(base_dir, 'js', 'pokemon-data-local.js')
 
     parser = argparse.ArgumentParser(description='Generate a safe JS dataset file for offline use (file://)')
-    parser.add_argument('input_json', nargs='?', default=default_in, help='Path to input JSON (default: json/pokemon-full-data.json)')
+    parser.add_argument('input_json', nargs='?', default=default_in, help='Path to input JSON (default: json/pokemon-index.json)')
     parser.add_argument('output_js', nargs='?', default=default_out, help='Path to output JS file (default: js/pokemon-data-local.js)')
     args = parser.parse_args()
 

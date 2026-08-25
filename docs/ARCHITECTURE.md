@@ -13,7 +13,7 @@ High-level structure
 - `js/data.js` — dataset loading (embedded JS file, JSON fetch, or file-picker fallback), region grouping, type-icon detection.
 - `js/text-utils.js` — `cap()`/`titleCase()`, shared between `index.html` and `pokemon-detail.html`.
 - `pokemon-detail.html` has its own markup/CSS/inline script (a distinct design from the list page) but loads `js/text-utils.js` for `titleCase()` rather than duplicating it, and caches its dataset fallback fetch in `sessionStorage`.
-- Data: Pokémon data is loaded from `js/pokemon-data.js` (optional global `ALL_POKEMON`) or `json/pokemon-full-data.json` via fetch or file picker fallback.
+- Data: `index.html` loads Pokémon data from `js/pokemon-data.js` (optional global `ALL_POKEMON`) or `json/pokemon-index.json` via fetch or file picker fallback — a lean per-Pokémon index, not the full enriched dataset. `pokemon-detail.html` loads the same index (for its pager and evolution-chart family lookup) plus one `json/details/{id}.json` file for the Pokémon being viewed. Both index and detail files are generated from `json/pokemon-full-data.json` by `python/split_pokemon_data.py` — see `docs/DATA_MODEL.md` for the full field split and `docs/DEVELOPMENT.md` for the generation pipeline.
 - Rendering: The app renders region sections and a responsive grid of Pokémon cards using DocumentFragment for batch updates.
 
 Core modules and responsibilities
@@ -67,13 +67,7 @@ Extending the app
 - Adding new filters: extend `Utils.matchesSearchQuery` and update `renderTypesPanel` and `renderPokemon` to respect the new filter states.
 - Adding a new persisted state: add helpers in `StorageManager` and use `LocalStorageCache` to persist the string value.
 
-Known issues (present independent of the module split, not yet fixed)
-
-- The sidebar's type filter buttons (`#types-list`, built by `renderTypesPanel`) live outside `#pokemon-list`'s DOM subtree, but the click delegation that handles `data-action="toggle-type"` is attached to `#pokemon-list`. Clicking a type filter currently does nothing.
-- A card's favorite star (`.fav-badge`) and its seen/caught status badges (`.status-badges`) can visually overlap once both seen and caught are set, making the star unclickable at that position.
-
 Files to inspect
 
 - `js/storage.js`, `js/render.js`, `js/data.js`, `js/text-utils.js` — see the module list above for what's in each.
 - `index.html` — markup plus the inline bootstrap `<script>` at the bottom (DOM wiring specific to this page).
-

@@ -4,3 +4,8 @@ js/pokemon-data-local.js
 
 # Scratch space for local testing artifacts
 .scratch/
+
+# Enrichment script working files — regenerate by re-running the script;
+# too large / too transient to belong in the repo.
+python/pokedex_details_cache.json
+*.backup.json

@@ -285,7 +285,7 @@
             helper.style.textAlign = 'center';
             helper.innerHTML = `
                 <div style="font-size:1.2em;font-weight:800;color:#ef5350;margin-bottom:12px;">Couldn't auto-load Pokémon data</div>
-                <div style="color:#333;margin-bottom:14px;">To continue, please select the <strong>pokemon-full-data.json</strong> file from this project's <em>json</em> folder. This file contains the database the app needs.</div>
+                <div style="color:#333;margin-bottom:14px;">To continue, please select the <strong>pokemon-index.json</strong> file from this project's <em>json</em> folder. This file contains the database the app needs.</div>
                 <input id="data-file" type="file" accept="application/json,.json" style="display:none;" />
                 <div style="display:flex;gap:12px;align-items:center;justify-content:center;margin-bottom:12px;">
                     <button id="choose-file" class="region-tab region-action" style="font-size:1.05em;padding:12px 18px;border-radius:12px;">Choose JSON file…</button>

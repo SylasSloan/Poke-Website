@@ -22,7 +22,7 @@ import urllib.request
 import urllib.error
 from pathlib import Path
 
-CACHE_FILE = Path(__file__).with_name("ability_cache.json")
+CACHE_FILE = Path(__file__).parents[1] / "json" / "ability_cache.json"
 POKEAPI_URL = "https://pokeapi.co/api/v2/ability/{name}"
 
 
@@ -112,7 +112,7 @@ def main():
     if len(sys.argv) > 1:
         json_path = Path(sys.argv[1])
     else:
-        json_path = Path(__file__).parents[1] / "pokemon-full-data.json"
+        json_path = Path(__file__).parents[1] / "json" / "pokemon-full-data.json"
     if not json_path.exists():
         print(f"[ERROR] JSON file not found: {json_path}")
         sys.exit(1)
